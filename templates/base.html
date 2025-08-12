@@ -210,6 +210,8 @@
         <a href="/search">カード検索</a>
         <a href="/advice">2Pickアドバイス</a>
         <a href="/deck_analyzer">デッキ分析</a>
+        <a href="/meta_info">メタ情報</a>
+        <a href="/system_stats">システム統計</a>
     </div>
     <div class="container">
         {% block content %}{% endblock %}
@@ -311,6 +313,61 @@
                     hideSuggestions();
                 }
             });
+        }
+        
+        // 既存のJavaScriptに追加
+        document.addEventListener('DOMContentLoaded', function() {
+            // 既存のsetupSuggestions呼び出し
+            setupSuggestions('query');
+            setupSuggestions('candidate1');
+            setupSuggestions('candidate2');
+            
+            // 入力自動保存機能を追加
+            setupAutoSave();
+        });
+
+        function setupAutoSave() {
+            // デッキ入力の自動保存・復元
+            const deckInput = document.getElementById('deck_input');
+            if (deckInput) {
+                // 保存された値を復元
+                const savedDeck = localStorage.getItem('sv2pick_last_deck');
+                if (savedDeck) {
+                    deckInput.value = savedDeck;
+                    // 復元されたことをユーザーに通知
+                    const notice = document.createElement('small');
+                    notice.style.color = '#666';
+                    notice.textContent = '前回入力内容を復元しました';
+                    deckInput.parentElement.appendChild(notice);
+                }
+                
+                // 入力内容を自動保存
+                deckInput.addEventListener('input', function() {
+                    localStorage.setItem('sv2pick_last_deck', this.value);
+                });
+            }
+            
+            // ピック番号とリロール回数の保存・復元
+            const pickIndex = document.getElementById('pick_index');
+            const rerollsLeft = document.getElementById('rerolls_left');
+            
+            if (pickIndex) {
+                const savedPickIndex = localStorage.getItem('sv2pick_pick_index');
+                if (savedPickIndex) pickIndex.value = savedPickIndex;
+                
+                pickIndex.addEventListener('change', function() {
+                    localStorage.setItem('sv2pick_pick_index', this.value);
+                });
+            }
+            
+            if (rerollsLeft) {
+                const savedRerolls = localStorage.getItem('sv2pick_rerolls');
+                if (savedRerolls) rerollsLeft.value = savedRerolls;
+                
+                rerollsLeft.addEventListener('change', function() {
+                    localStorage.setItem('sv2pick_rerolls', this.value);
+                });
+            }
         }
         
         // ページ読み込み後に初期化

@@ -69,28 +69,31 @@
         <table>
             <tr>
                 <th>カード名</th><th>コスト</th><th>最終スコア</th>
-                <th>基本</th><th>カーブ</th><th>役割</th><th>シナジー</th><th>戦略</th><th>重複</th>
+                <th>基本</th><th>カーブ</th><th>役割</th><th>シナジー</th><th>戦略</th><th>メタ</th><th>重複</th>
             </tr>
             {% for score in advice_result.card_scores %}
             <tr>
                 <td><strong>{{ score.name }}</strong></td>
                 <td>{{ score.cost }}</td>
-                <td style="font-weight: bold; color: var(--primary);">{{ score.final_score }}</td>
-                <td>{{ score.base_score }}</td>
+                <td style="font-weight: bold; color: var(--primary);">{{ '%.1f' % score.final_score }}</td>
+                <td>{{ '%.1f' % score.base_score }}</td>
                 <td style="color: {{ '#48bb78' if score.curve_bonus >= 0 else '#f56565' }};">
                     {{ '+%.1f' % score.curve_bonus if score.curve_bonus >= 0 else '%.1f' % score.curve_bonus }}
                 </td>
                 <td style="color: {{ '#48bb78' if score.role_bonus >= 0 else '#f56565' }};">
                     {{ '+%.1f' % score.role_bonus if score.role_bonus >= 0 else '%.1f' % score.role_bonus }}
                 </td>
-                <td style="color: {{ '#48bb78' if score.synergy_bonus >= 0 else '#f56565' }};">
-                    {{ '+%.1f' % score.synergy_bonus if score.synergy_bonus >= 0 else '%.1f' % score.synergy_bonus }}
-                    {% if score.synergy_reasons %}
-                        <br><small style="color: #666;">{{ score.synergy_reasons[0] if score.synergy_reasons else '' }}</small>
+                <td style="color: {{ '#48bb78' if score.get('synergy_bonus', 0) >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.get('synergy_bonus', 0) if score.get('synergy_bonus', 0) >= 0 else '%.1f' % score.get('synergy_bonus', 0) }}
+                    {% if score.get('synergy_reasons') and score.synergy_reasons|length > 0 %}
+                        <br><small style="color: #666;">{{ score.synergy_reasons[0] }}</small>
                     {% endif %}
                 </td>
-                <td style="color: {{ '#48bb78' if score.archetype_bonus >= 0 else '#f56565' }};">
-                    {{ '+%.1f' % score.archetype_bonus if score.archetype_bonus >= 0 else '%.1f' % score.archetype_bonus }}
+                <td style="color: {{ '#48bb78' if score.get('archetype_bonus', 0) >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.get('archetype_bonus', 0) if score.get('archetype_bonus', 0) >= 0 else '%.1f' % score.get('archetype_bonus', 0) }}
+                </td>
+                <td style="color: {{ '#48bb78' if score.get('meta_bonus', 0) >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.get('meta_bonus', 0) if score.get('meta_bonus', 0) >= 0 else '%.1f' % score.get('meta_bonus', 0) }}
                 </td>
                 <td style="color: {{ '#48bb78' if score.duplication_penalty >= 0 else '#f56565' }};">
                     {{ '+%.1f' % score.duplication_penalty if score.duplication_penalty >= 0 else '%.1f' % score.duplication_penalty }}
@@ -99,6 +102,14 @@
             {% endfor %}
         </table>
     </div>
+
+    <!-- メタ情報表示を追加 -->
+    <div class="alert alert-info" style="margin-top: 1rem;">
+        <strong>現在のメタ環境:</strong> {{ advisor.meta_info.meta_description if advisor.meta_info else '標準環境' }}
+        <br><small>最終更新: {{ advisor.meta_info.last_updated if advisor.meta_info else '未設定' }}</small>
+    </div>
+
+
 </div>
 {% endif %}
 {% endblock %}

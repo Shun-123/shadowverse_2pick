@@ -1,16 +1,20 @@
 # app.py
 from flask import Flask, render_template, request, jsonify
 import json
+import sqlite3
 from enhanced_advisor import EnhancedTwoPickAdvisor
 from card_resolver import CardResolver
+from meta_adjustments import get_meta_info
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 
-# システム初期化
-advisor = EnhancedTwoPickAdvisor()
-resolver = CardResolver()
+# データベースパスとアドバイザー初期化
+DB_PATH = "shadowverse_cards.db"
+advisor = EnhancedTwoPickAdvisor(db_path=DB_PATH)
+resolver = CardResolver(db_path=DB_PATH)
 
+# クラス表示名マッピング
 CLASS_NAMES = {
     0: "ニュートラル", 1: "エルフ", 2: "ロイヤル", 3: "ウィッチ",
     4: "ドラゴン", 5: "ナイトメア", 6: "ビショップ", 7: "ネメシス"
@@ -18,6 +22,7 @@ CLASS_NAMES = {
 
 @app.route('/')
 def index():
+    """トップページ"""
     return render_template('index.html')
 
 @app.route('/api/search_suggestions')
@@ -49,8 +54,7 @@ def card_search():
                 card = advisor.get_card_info(card_id)
                 if card:
                     # メトリクス情報も取得
-                    import sqlite3
-                    with sqlite3.connect(advisor.db_path) as conn:
+                    with sqlite3.connect(DB_PATH) as conn:
                         cursor = conn.execute(
                             "SELECT base_rating, stat_efficiency, role_score, keyword_score, impact_score FROM card_metrics WHERE card_id = ?",
                             (card_id,)
@@ -60,11 +64,11 @@ def card_search():
                     card_info = {
                         'basic': card,
                         'metrics': {
-                            'base_rating': round(metrics[0], 1) if metrics else 50.0,
-                            'stat_efficiency': round(metrics[1], 1) if metrics else 0.0,
-                            'role_score': round(metrics[2], 1) if metrics else 0.0,
-                            'keyword_score': round(metrics[3], 1) if metrics else 0.0,
-                            'impact_score': round(metrics[4], 1) if metrics else 0.0
+                            'base_rating': round(metrics[0], 1) if metrics and metrics[0] is not None else 50.0,
+                            'stat_efficiency': round(metrics[1], 1) if metrics and metrics[1] is not None else 0.0,
+                            'role_score': round(metrics[2], 1) if metrics and metrics[2] is not None else 0.0,
+                            'keyword_score': round(metrics[3], 1) if metrics and metrics[3] is not None else 0.0,
+                            'impact_score': round(metrics[4], 1) if metrics and metrics[4] is not None else 0.0
                         },
                         'class_display': CLASS_NAMES.get(card['class_id'], '不明')
                     }
@@ -109,27 +113,9 @@ def pick_advice():
                         'action_text': 'リロール推奨' if advice.action == 'reroll' else f'{advice.recommended_card_name} を選択',
                         'confidence': round(advice.confidence, 1),
                         'reasoning': advice.reasoning,
-                        'card_scores': [],
+                        'card_scores': advice.card_scores,
                         'deck_info': f"デッキ: {result['resolved_deck_count']}/{result['original_deck_count']}枚解決"
                     }
-                    
-                    # カード詳細情報付きスコア
-                    for score in advice.card_scores:
-                        card_detail = advisor.get_card_info(score['card_id'])
-                        if card_detail:
-                            advice_result['card_scores'].append({
-                                'name': card_detail['name'],
-                                'cost': card_detail['cost'],
-                                'final_score': round(score['final_score'], 1),
-                                'base_score': round(score['base_score'], 1),
-                                'curve_bonus': round(score['curve_bonus'], 1),
-                                'role_bonus': round(score['role_bonus'], 1),
-                                'synergy_bonus': round(score.get('synergy_bonus', 0), 1),      # 追加
-                                'archetype_bonus': round(score.get('archetype_bonus', 0), 1),  # 追加
-                                'duplication_penalty': round(score['duplication_penalty'], 1),
-                                'synergy_reasons': score.get('synergy_reasons', []),           # 追加
-                                'archetype_reasons': score.get('archetype_reasons', [])        # 追加（必要に応じて）
-                            })
                 
         except ValueError:
             error_message = "ピック番号とリロール回数は数値で入力してください"
@@ -156,6 +142,46 @@ def deck_analyzer():
             error_message = f"エラーが発生しました: {str(e)}"
     
     return render_template('deck_analyzer.html', analysis_result=analysis_result, error_message=error_message)
+
+@app.route('/meta_info')
+def meta_info():
+    """メタ情報表示ページ"""
+    meta = get_meta_info()
+    adjustments = advisor.meta_adjustments
+    
+    return render_template('meta_info.html', 
+                         meta_info=meta, 
+                         adjustments=adjustments)
+                         
+@app.route('/system_stats')
+def system_stats():
+    """システム統計ページ"""
+    cache_stats = advisor.get_cache_stats()
+    
+    # データベース統計
+    with sqlite3.connect(advisor.db_path) as conn:
+        total_cards = conn.execute("SELECT COUNT(*) FROM cards WHERE is_token = 0").fetchone()[0]
+        total_metrics = conn.execute("SELECT COUNT(*) FROM card_metrics").fetchone()[0]
+    
+    stats = {
+        'database': {
+            'total_cards': total_cards,
+            'total_metrics': total_metrics
+        },
+        'cache': cache_stats,
+        'meta_info': get_meta_info()
+    }
+    
+    return render_template('system_stats.html', stats=stats)
+
+@app.route('/api/cache/clear', methods=['POST'])
+def clear_cache():
+    """キャッシュクリアAPI"""
+    try:
+        card_info_cache.clear()
+        return jsonify({'success': True, 'message': 'キャッシュをクリアしました'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

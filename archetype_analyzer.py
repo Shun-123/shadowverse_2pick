@@ -131,8 +131,8 @@ class ArchetypeAnalyzer:
         if not cards:
             return {"detected_archetype": None, "confidence": 0, "recommendations": []}
 
-        # 主要クラス特定
-        main_class = max(class_counts.keys(), key=lambda x: class_counts[x])
+        # 主要クラス特定（空の場合の安全処理）
+        main_class = max(class_counts.keys(), key=lambda x: class_counts[x]) if class_counts else 0
 
         # アーキタイプスコア計算
         best_archetype = None

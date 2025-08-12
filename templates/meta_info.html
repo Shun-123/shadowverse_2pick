@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <h2>📈 メタゲーム情報</h2>
+    
+    <div class="alert alert-info">
+        <strong>現在の環境:</strong> {{ meta_info.meta_description }}
+        <br><strong>最終更新:</strong> {{ meta_info.last_updated }}
+        <br><strong>ティア情報:</strong> {{ meta_info.tier_info }}
+    </div>
+    
+    <h3>🎯 現在の調整値</h3>
+    
+    <!-- カードID調整 -->
+    {% if adjustments.card_id %}
+    <h4>個別カード調整</h4>
+    <div style="background: #f9f9f9; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+        {% for card_id, bonus in adjustments.card_id.items() %}
+        <span style="display: inline-block; background: {{ '#48bb78' if bonus >= 0 else '#f56565' }}; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; margin: 0.25rem;">
+            ID {{ card_id }}: {{ '+%.1f' % bonus if bonus >= 0 else '%.1f' % bonus }}
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- アーキタイプ調整 -->
+    {% if adjustments.archetype %}
+    <h4>アーキタイプ調整</h4>
+    <div style="background: #f9f9f9; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+        {% for archetype, bonus in adjustments.archetype.items() %}
+        <span style="display: inline-block; background: {{ '#48bb78' if bonus >= 0 else '#f56565' }}; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; margin: 0.25rem;">
+            {{ archetype }}: {{ '+%.1f' % bonus if bonus >= 0 else '%.1f' % bonus }}
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- クラス調整 -->
+    {% if adjustments.class_name %}
+    <h4>クラス調整</h4>
+    <div style="background: #f9f9f9; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+        {% for class_name, bonus in adjustments.class_name.items() %}
+        <span style="display: inline-block; background: {{ '#48bb78' if bonus >= 0 else '#f56565' }}; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; margin: 0.25rem;">
+            {{ class_name }}: {{ '+%.1f' % bonus if bonus >= 0 else '%.1f' % bonus }}
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <div class="alert alert-warning">
+        <strong>注意:</strong> メタ調整を変更するには、<code>meta_adjustments.py</code> ファイルを編集し、アプリケーションを再起動してください。
+    </div>
+</div>
+{% endblock %}

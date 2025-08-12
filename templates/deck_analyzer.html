@@ -92,7 +92,7 @@
     </ul>
     {% endif %}
     
-        <!-- シナジー分析セクション -->
+    <!-- シナジー分析セクション -->
     {% if analysis_result.synergy_analysis %}
     <h4>🔗 シナジー分析</h4>
     <div style="background: #f9f9f9; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
@@ -121,7 +121,7 @@
         {% if analysis_result.archetype_analysis.detected_archetype %}
         <strong>検出: {{ analysis_result.archetype_analysis.detected_archetype }}</strong>
         （信頼度: {{ analysis_result.archetype_analysis.confidence }}%）<br>
-        {{ analysis_result.archetype_analysis.archetype_description }}
+        {{ analysis_result.archetype_analysis.get('archetype_description', '') }}
         {% else %}
         明確なアーキタイプが検出されませんでした。バランス型デッキを目指しましょう。
         {% endif %}

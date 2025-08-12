@@ -2,7 +2,7 @@
 import sqlite3
 import json
 import re
-from typing import Dict, List, Any, Tuple, Set
+from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass
 
 @dataclass
@@ -22,7 +22,7 @@ class SynergyEngine:
 
     def _initialize_synergy_rules(self) -> Dict[int, List[SynergyRule]]:
         """クラス別シナジールールを定義"""
-        rules = {
+        return {
             # 0: ニュートラル
             0: [
                 SynergyRule("エンハンス", [r"エンハンス"], [r"エンハンス"], 2, 8, 2),
@@ -34,7 +34,6 @@ class SynergyEngine:
                 SynergyRule("フェアリー", [r"フェアリー.*手札", r"フェアリー.*場"], 
                            [r"フェアリー", r"手札.*枚.*以上"], 3, 12, 3),
                 SynergyRule("コンボ", [r"コンボ"], [r"コンボ_\d+"], 2, 15, 4),
-                SynergyRule("自然", [r"ナチュラ"], [r"ナチュラ"], 2, 10, 3),
             ],
             
             # 2: ロイヤル
@@ -79,7 +78,6 @@ class SynergyEngine:
                 SynergyRule("共鳴", [r"共鳴"], [r"共鳴"], 2, 8, 3),
             ]
         }
-        return rules
 
     def analyze_deck_synergies(self, card_ids: List[str]) -> Dict[str, Any]:
         """デッキのシナジー分析"""
@@ -93,7 +91,7 @@ class SynergyEngine:
         with sqlite3.connect(self.db_path) as conn:
             for card_id in card_ids:
                 cursor = conn.execute("""
-                    SELECT card_id, name, class_id, skill_text, evo_skill_text, keywords
+                    SELECT card_id, name, class_id, skill_text, evo_skill_text, keywords, card_type
                     FROM cards WHERE card_id = ?
                 """, (card_id,))
                 row = cursor.fetchone()
@@ -104,12 +102,13 @@ class SynergyEngine:
                         'class_id': row[2],
                         'skill_text': row[3] or '',
                         'evo_skill_text': row[4] or '',
-                        'keywords': json.loads(row[5] or '[]')
+                        'keywords': json.loads(row[5] or '[]'),
+                        'card_type': row[6] or ''  # 追加
                     }
                     cards.append(card_data)
                     class_counts[row[2]] = class_counts.get(row[2], 0) + 1
 
-        # 主要クラスを特定
+        # 主要クラスを特定（空の場合の安全処理）
         main_class = max(class_counts.keys(), key=lambda x: class_counts[x]) if class_counts else 0
 
         # シナジーカウント
@@ -123,13 +122,17 @@ class SynergyEngine:
             for card in cards:
                 full_text = f"{card['skill_text']} {card['evo_skill_text']}"
                 
-                # エネーブラー（基盤提供）をカウント
-                for pattern in rule.enabler_patterns:
-                    if re.search(pattern, full_text, re.IGNORECASE):
-                        enabler_count += 1
-                        break
+                # ウィッチのスペルブーストルール専用パッチ
+                if rule.name == "スペルブースト" and card['card_type'] == 'spell':
+                    enabler_count += 1
+                else:
+                    # 既存のパターンマッチング
+                    for pattern in rule.enabler_patterns:
+                        if re.search(pattern, full_text, re.IGNORECASE):
+                            enabler_count += 1
+                            break
                 
-                # ペイオフ（基盤活用）をカウント
+                # ペイオフ（既存のまま）
                 for pattern in rule.payoff_patterns:
                     if re.search(pattern, full_text, re.IGNORECASE):
                         payoff_count += 1

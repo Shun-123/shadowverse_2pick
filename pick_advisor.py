@@ -1,12 +1,14 @@
 # pick_advisor.py
 import sqlite3
 import json
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from cache_system import card_info_cache, cached_method
 
 @dataclass
 class PickAdvice:
-    action: str  # "pick" or "reroll"
+    """ピックアドバイス結果"""
+    action: str
     recommended_card_id: Optional[str]
     recommended_card_name: Optional[str]
     confidence: float
@@ -25,8 +27,10 @@ class TwoPickAdvisor:
             "removal": 4, "draw": 3, "finisher": 2, "protection": 3, "aoe": 2
         }
 
+    @cached_method(card_info_cache, "card_info")
     def get_card_info(self, card_id: str) -> Optional[Dict[str, Any]]:
-        """カード情報とメトリクスを取得"""
+        """キャッシュ対応のカード情報取得"""
+        # 既存の実装をそのまま使用（デコレータがキャッシュを処理）
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("""
                 SELECT c.*, m.base_rating, m.stat_efficiency, m.role_score,
@@ -48,6 +52,10 @@ class TwoPickAdvisor:
             card["keywords"] = json.loads(card["keywords"] or "[]")
             
             return card
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """キャッシュ統計を取得"""
+        return card_info_cache.get_stats()
 
     def analyze_deck(self, deck_card_ids: List[str]) -> Dict[str, Any]:
         """現在のデッキを分析"""
@@ -223,50 +231,3 @@ class TwoPickAdvisor:
             reasoning=reasoning,
             card_scores=card_scores
         )
-
-def test_advisor():
-    """アドバイザーのテスト"""
-    advisor = TwoPickAdvisor()
-    
-    # テスト用データ取得
-    with sqlite3.connect("shadowverse_cards.db") as conn:
-        cursor = conn.execute("""
-            SELECT card_id FROM cards 
-            WHERE is_token = 0 AND cost <= 4
-            LIMIT 10
-        """)
-        test_card_ids = [row[0] for row in cursor.fetchall()]
-    
-    if len(test_card_ids) < 4:
-        print("テスト用カードが不足しています")
-        return
-    
-    # テストシナリオ
-    current_deck = test_card_ids[:3]
-    candidates = test_card_ids[3:5]
-    
-    print("=== 2Pick アドバイザー テスト ===")
-    advice = advisor.get_pick_advice(
-        candidate_card_ids=candidates,
-        current_deck_ids=current_deck,
-        pick_index=4,
-        rerolls_left=2
-    )
-    
-    print(f"推奨アクション: {advice.action}")
-    if advice.recommended_card_name:
-        print(f"推奨カード: {advice.recommended_card_name}")
-    print(f"信頼度: {advice.confidence:.1f}%")
-    
-    print("\n推奨理由:")
-    for reason in advice.reasoning:
-        print(f"  - {reason}")
-    
-    print(f"\n各カードの評価:")
-    for score in advice.card_scores:
-        print(f"  {score['name']}: {score['final_score']:.1f}点 "
-              f"(基本{score['base_score']:.1f} + カーブ{score['curve_bonus']:+.1f} + "
-              f"役割{score['role_bonus']:+.1f})")
-
-if __name__ == "__main__":
-    test_advisor()
