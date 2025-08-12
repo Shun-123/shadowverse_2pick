@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <h2>🎯 勝率予測</h2>
+    <p>デッキ構成から2Pickでの勝率を予測します。</p>
+    
+    <form method="POST">
+        <div class="form-group">
+            <label for="deck_input">デッキ内容（カード名またはIDをカンマ区切り）:</label>
+            <textarea id="deck_input" name="deck_input" rows="6" required
+                      placeholder="例: 不屈のファイター, ベルエンジェル・リア, 知恵の輝き, ..."></textarea>
+        </div>
+        <button type="submit" class="btn">勝率を予測</button>
+    </form>
+    
+    {% if prediction_result %}
+    <div class="card" style="margin-top: 2rem;">
+        <h3>📊 予測結果</h3>
+        
+        <div style="text-align: center; margin: 2rem 0;">
+            <div style="font-size: 3em; font-weight: bold; color: var(--primary);">
+                {{ prediction_result.win_rate }}%
+            </div>
+            <div style="font-size: 1.2em; color: #666;">
+                予測勝率（信頼度: {{ prediction_result.confidence }}%）
+            </div>
+        </div>
+        
+        <h4>📈 要因分析</h4>
+        <div style="background: #f9f9f9; padding: 1rem; border-radius: 8px;">
+            {% for factor, score in prediction_result.factors.items() %}
+            <div style="margin: 0.5rem 0; display: flex; align-items: center;">
+                <span style="width: 120px;">{{ factor }}:</span>
+                <div style="background: #e2e8f0; height: 20px; width: 200px; border-radius: 10px; margin-right: 1rem;">
+                    <div style="background: var(--primary); height: 100%; width: {{ score * 100 }}%; border-radius: 10px;"></div>
+                </div>
+                <span>{{ '%.0f' % (score * 100) }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <h4>💡 改善提案</h4>
+        <ul>
+            {% for rec in prediction_result.recommendations %}
+            <li>{{ rec }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

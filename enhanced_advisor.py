@@ -7,15 +7,19 @@ import sqlite3
 import json
 from typing import Dict, List, Any, Optional
 from meta_adjustments import get_meta_adjustments, get_meta_info
+from weights_manager import WeightsManager
+import config
 
 class EnhancedTwoPickAdvisor(TwoPickAdvisor):
-    def __init__(self, db_path: str = "shadowverse_cards.db"):
+    def __init__(self, db_path: str = config.DB_PATH):
         super().__init__(db_path)
         self.resolver = CardResolver(db_path)
         self.synergy_engine = SynergyEngine(db_path)
         self.archetype_analyzer = ArchetypeAnalyzer(db_path)
+        self.weights_manager = WeightsManager()  # 追加
         
         # メタ調整情報を読み込み
+        from meta_adjustments import get_meta_adjustments, get_meta_info
         self.meta_adjustments = get_meta_adjustments()
         self.meta_info = get_meta_info()
 
@@ -101,6 +105,7 @@ class EnhancedTwoPickAdvisor(TwoPickAdvisor):
         detected_archetype = archetype_analysis.get("detected_archetype")
         
         card_scores = []
+        weights = self.weights_manager.get_weights() 
         
         # 各候補カードを評価
         for card_id in candidate_card_ids:
@@ -132,8 +137,15 @@ class EnhancedTwoPickAdvisor(TwoPickAdvisor):
             # メタボーナス（新規追加）
             meta_bonus = self._calculate_meta_bonus(card, detected_archetype, deck_class_name)
             
-            final_score = (base_score + curve_bonus + role_bonus + 
-                         duplication_penalty + synergy_bonus + archetype_bonus + meta_bonus)
+            final_score = (
+                weights.get("base", 1.0) * base_score +
+                weights.get("curve", 1.0) * curve_bonus +
+                weights.get("role", 1.0) * role_bonus +
+                weights.get("duplication", 1.0) * duplication_penalty +
+                weights.get("synergy", 1.0) * synergy_bonus +
+                weights.get("archetype", 1.0) * archetype_bonus +
+                weights.get("meta", 1.0) * meta_bonus
+            )
             
             card_scores.append({
                 "card_id": card_id,

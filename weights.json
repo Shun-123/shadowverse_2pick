@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "weights": {
+    "base": 1.0,
+    "curve": 1.0,
+    "role": 1.0,
+    "duplication": 1.0,
+    "synergy": 1.0,
+    "archetype": 1.0,
+    "meta": 1.0
+  }
+}

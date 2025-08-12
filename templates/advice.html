@@ -103,11 +103,110 @@
         </table>
     </div>
 
+    <!-- 既存の評価テーブルの下に追加 -->
+    {% if advice_result %}
+    <div class="card" style="margin-top: 1rem; background: #f0f8ff;">
+        <h4>📝 実際の選択を記録（任意）</h4>
+        <p>実際に選んだカードを記録することで、アドバイザーの精度向上に貢献できます。</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 1rem; align-items: end;">
+            <div class="form-group">
+                <label for="actual_action">実際のアクション:</label>
+                <select id="actual_action">
+                    <option value="pick">カードを選択</option>
+                    <option value="reroll">リロール</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="chosen_card">選んだカード:</label>
+                <select id="chosen_card">
+                    {% for score in advice_result.card_scores %}
+                    <option value="{{ score.card_id }}">{{ score.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <button class="btn" onclick="logPick()" style="background: var(--success);">
+                    選択を記録
+                </button>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="session_id">セッションID（任意）:</label>
+            <input type="text" id="session_id" placeholder="例: my_draft_001">
+            <small style="color: #666;">同じドラフトセッションでは同じIDを使用してください</small>
+        </div>
+    </div>
+
+    <script>
+    function logPick() {
+        const sessionId = document.getElementById('session_id').value || 
+                         `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const action = document.getElementById('actual_action').value;
+        const chosenId = document.getElementById('chosen_card').value;
+        
+        const pickIndex = parseInt(document.getElementById('pick_index').value) || 1;
+        const rerollsLeft = parseInt(document.getElementById('rerolls_left').value) || 0;
+        
+        const scores = {{ advice_result.card_scores | tojson if advice_result else '[]' }};
+        const candidateIds = scores.map(s => s.card_id);
+        const recommendedId = "{{ advice_result.advice.recommended_card_id if advice_result and advice_result.advice.recommended_card_id else '' }}";
+        
+        const deckInput = document.getElementById('deck_input').value || '';
+        const deckSnapshot = deckInput.split(',').map(s => s.trim()).filter(Boolean);
+        
+        fetch('/api/log_pick', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                session_id: sessionId,
+                pick_index: pickIndex,
+                rerolls_left: rerollsLeft,
+                candidate1_id: candidateIds[0] || null,
+                candidate2_id: candidateIds[1] || null,
+                recommended_id: recommendedId || null,
+                chosen_id: action === 'pick' ? chosenId : null,
+                action: action,
+                scores: scores,
+                deck_snapshot: deckSnapshot
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('選択を記録しました！継続的な改善にご協力ありがとうございます。');
+                // セッションIDを保存
+                localStorage.setItem('sv2pick_session_id', sessionId);
+            } else {
+                alert('記録に失敗しました: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました');
+        });
+    }
+
+    // ページ読み込み時にセッションIDを復元
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedSessionId = localStorage.getItem('sv2pick_session_id');
+        if (savedSessionId) {
+            document.getElementById('session_id').value = savedSessionId;
+        }
+    });
+    </script>
+    {% endif %}
+
+
     <!-- メタ情報表示を追加 -->
     <div class="alert alert-info" style="margin-top: 1rem;">
         <strong>現在のメタ環境:</strong> {{ advisor.meta_info.meta_description if advisor.meta_info else '標準環境' }}
         <br><small>最終更新: {{ advisor.meta_info.last_updated if advisor.meta_info else '未設定' }}</small>
     </div>
+
 
 
 </div>

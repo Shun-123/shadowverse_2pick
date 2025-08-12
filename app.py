@@ -1,24 +1,38 @@
 # app.py
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 import json
-import sqlite3
+import logging
+import subprocess
+import os
+from config import DB_PATH, CLASS_NAMES, LOG_FILE, LOG_LEVEL, APP_CONFIG
 from enhanced_advisor import EnhancedTwoPickAdvisor
 from card_resolver import CardResolver
-from meta_adjustments import get_meta_info
+from learning_system import LearningSystem
+from win_predictor import WinRatePredictor
+
+
+# ログ設定
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 
-# データベースパスとアドバイザー初期化
-DB_PATH = "shadowverse_cards.db"
+# システム初期化
 advisor = EnhancedTwoPickAdvisor(db_path=DB_PATH)
 resolver = CardResolver(db_path=DB_PATH)
+learning_system = LearningSystem()
+win_predictor = WinRatePredictor()
 
-# クラス表示名マッピング
-CLASS_NAMES = {
-    0: "ニュートラル", 1: "エルフ", 2: "ロイヤル", 3: "ウィッチ",
-    4: "ドラゴン", 5: "ナイトメア", 6: "ビショップ", 7: "ネメシス"
-}
+logger.info("シャドウバース 2Pickアドバイザー起動")
+
 
 @app.route('/')
 def index():
@@ -122,7 +136,7 @@ def pick_advice():
         except Exception as e:
             error_message = f"エラーが発生しました: {str(e)}"
     
-    return render_template('advice.html', advice_result=advice_result, error_message=error_message)
+    return render_template('advice.html', advice_result=advice_result, error_message=error_message, advisor=advisor)
 
 @app.route('/deck_analyzer', methods=['GET', 'POST'])
 def deck_analyzer():
@@ -182,6 +196,133 @@ def clear_cache():
         return jsonify({'success': True, 'message': 'キャッシュをクリアしました'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+        
+@app.route('/api/log_pick', methods=['POST'])
+def api_log_pick():
+    """ピック選択をログに記録"""
+    data = request.json or {}
+    
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            # セッション確認・作成
+            session_id = data.get('session_id')
+            if session_id:
+                cursor = conn.execute(
+                    "SELECT session_id FROM pick_sessions WHERE session_id = ?",
+                    (session_id,)
+                )
+                if not cursor.fetchone():
+                    conn.execute(
+                        "INSERT INTO pick_sessions (session_id) VALUES (?)",
+                        (session_id,)
+                    )
+            
+            # ピックログ記録
+            conn.execute("""
+                INSERT INTO pick_logs 
+                (session_id, pick_index, rerolls_left, candidate1_id, candidate2_id,
+                 recommended_id, chosen_id, action, scores_json, deck_snapshot)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                session_id,
+                data.get('pick_index'),
+                data.get('rerolls_left'),
+                data.get('candidate1_id'),
+                data.get('candidate2_id'),
+                data.get('recommended_id'),
+                data.get('chosen_id'),
+                data.get('action'),
+                json.dumps(data.get('scores', []), ensure_ascii=False),
+                json.dumps(data.get('deck_snapshot', []), ensure_ascii=False)
+            ))
+            
+            conn.commit()
+            
+        logger.info(f"ピック記録保存: session={session_id}, action={data.get('action')}")
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        logger.error(f"ピック記録保存エラー: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/train_weights', methods=['POST'])
+def api_train_weights():
+    """重み学習を実行"""
+    try:
+        result = learning_system.train_and_update()
+        logger.info(f"重み学習実行: {result}")
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"重み学習エラー: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/win_prediction', methods=['GET', 'POST'])
+def win_prediction():
+    """勝率予測ページ"""
+    prediction_result = None
+    
+    if request.method == 'POST':
+        deck_input = request.form.get('deck_input', '').strip()
+        if deck_input:
+            # デッキ分析
+            analysis = advisor.get_deck_analysis_detailed(deck_input)
+            
+            # カードIDリスト作成
+            deck_ids = []
+            deck_names = [name.strip() for name in deck_input.replace('、', ',').split(',')]
+            for name in deck_names:
+                card_id = advisor.resolver.resolve_card_id(name)
+                if card_id:
+                    deck_ids.append(card_id)
+            
+            # 勝率予測
+            prediction = win_predictor.predict_win_rate(deck_ids, analysis)
+            prediction_result = prediction
+    
+    return render_template('win_prediction.html', prediction_result=prediction_result)
+
+@app.route('/update_card_data', methods=['POST'])
+def update_card_data():
+    """カードデータ更新処理"""
+    logger.info("カードデータ更新リクエスト受信")
+    
+    try:
+        # shadowverse_db_builder.py を実行
+        result = subprocess.run(
+            ["python", "shadowverse_db_builder.py"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=300  # 5分でタイムアウト
+        )
+        
+        # メトリクス再構築
+        subprocess.run(
+            ["python", "build_card_metrics.py"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60
+        )
+        
+        logger.info("カードデータ更新完了")
+        return jsonify({
+            'success': True, 
+            'message': 'カードデータとメトリクスの更新が完了しました'
+        })
+        
+    except subprocess.TimeoutExpired:
+        logger.error("カードデータ更新がタイムアウトしました")
+        return jsonify({
+            'success': False, 
+            'message': 'カードデータ更新がタイムアウトしました'
+        }), 500
+    except subprocess.CalledProcessError as e:
+        logger.error(f"カードデータ更新エラー: {e.stderr}")
+        return jsonify({
+            'success': False, 
+            'message': f'更新エラー: {e.stderr}'
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
