@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <h2>2Pickアドバイス</h2>
+    <p>カード名またはIDで入力できます。入力中に候補が表示されます。</p>
+    
+    <form method="POST">
+        <div class="form-group">
+            <label for="candidate1">候補カード1:</label>
+            <input type="text" id="candidate1" name="candidate1" required 
+                   placeholder="例: 二刀のゴブリン または 10201110">
+        </div>
+        
+        <div class="form-group">
+            <label for="candidate2">候補カード2:</label>
+            <input type="text" id="candidate2" name="candidate2" required 
+                   placeholder="例: アドベンチャーエルフ・メイ または 10012110">
+        </div>
+        
+        <div class="form-group">
+            <label for="deck_input">現在のデッキ (カード名またはIDをカンマ区切り):</label>
+            <textarea id="deck_input" name="deck_input" rows="3" 
+                      placeholder="例: 不屈のファイター, ベルエンジェル・リア, 10101110"></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 1rem;">
+            <div class="form-group" style="flex: 1;">
+                <label for="pick_index">ピック番号:</label>
+                <input type="number" id="pick_index" name="pick_index" value="1" min="1" max="15">
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label for="rerolls_left">残りリロール:</label>
+                <input type="number" id="rerolls_left" name="rerolls_left" value="2" min="0" max="5">
+            </div>
+        </div>
+        
+        <button type="submit" class="btn">アドバイスを取得</button>
+    </form>
+</div>
+
+{% if error_message %}
+<div class="alert alert-error">{{ error_message }}</div>
+{% endif %}
+
+{% if advice_result %}
+<div class="card">
+    <h3>📋 アドバイス結果</h3>
+    
+    <div style="font-size: 1.2em; margin: 1rem 0; padding: 1rem; background: #f0f8ff; border-radius: 8px;">
+        <strong>推奨: {{ advice_result.action_text }}</strong>
+        <span style="background: var(--primary); color: white; padding: 0.25rem 0.75rem; border-radius: 20px; margin-left: 1rem; font-size: 0.9em;">
+            信頼度: {{ advice_result.confidence }}%
+        </span>
+    </div>
+    
+    {% if advice_result.deck_info %}
+    <div class="alert alert-info">{{ advice_result.deck_info }}</div>
+    {% endif %}
+    
+    <h4>推奨理由:</h4>
+    <ul style="margin: 1rem 0; padding-left: 2rem;">
+        {% for reason in advice_result.reasoning %}
+        <li style="margin: 0.5rem 0;">{{ reason }}</li>
+        {% endfor %}
+    </ul>
+    
+    <h4>各カードの評価:</h4>
+    <div style="overflow-x: auto;">
+        <table>
+            <tr>
+                <th>カード名</th><th>コスト</th><th>最終スコア</th>
+                <th>基本</th><th>カーブ</th><th>役割</th><th>シナジー</th><th>戦略</th><th>重複</th>
+            </tr>
+            {% for score in advice_result.card_scores %}
+            <tr>
+                <td><strong>{{ score.name }}</strong></td>
+                <td>{{ score.cost }}</td>
+                <td style="font-weight: bold; color: var(--primary);">{{ score.final_score }}</td>
+                <td>{{ score.base_score }}</td>
+                <td style="color: {{ '#48bb78' if score.curve_bonus >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.curve_bonus if score.curve_bonus >= 0 else '%.1f' % score.curve_bonus }}
+                </td>
+                <td style="color: {{ '#48bb78' if score.role_bonus >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.role_bonus if score.role_bonus >= 0 else '%.1f' % score.role_bonus }}
+                </td>
+                <td style="color: {{ '#48bb78' if score.synergy_bonus >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.synergy_bonus if score.synergy_bonus >= 0 else '%.1f' % score.synergy_bonus }}
+                    {% if score.synergy_reasons %}
+                        <br><small style="color: #666;">{{ score.synergy_reasons[0] if score.synergy_reasons else '' }}</small>
+                    {% endif %}
+                </td>
+                <td style="color: {{ '#48bb78' if score.archetype_bonus >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.archetype_bonus if score.archetype_bonus >= 0 else '%.1f' % score.archetype_bonus }}
+                </td>
+                <td style="color: {{ '#48bb78' if score.duplication_penalty >= 0 else '#f56565' }};">
+                    {{ '+%.1f' % score.duplication_penalty if score.duplication_penalty >= 0 else '%.1f' % score.duplication_penalty }}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

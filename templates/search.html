@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>カード検索</h2>
+<form method="POST">
+    <div class="form-group">
+        <label for="query">カードIDまたは名前:</label>
+        <input type="text" id="query" name="query" placeholder="例: 10201110 または 二刀のゴブリン">
+    </div>
+    <button type="submit">検索</button>
+</form>
+
+{% if error_message %}
+<div class="error">{{ error_message }}</div>
+{% endif %}
+
+{% if card_info %}
+<div class="result">
+    <h3>{{ card_info.basic.name }} (ID: {{ card_info.basic.card_id }})</h3>
+    <table>
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>クラス</td><td>{{ card_info.class_display }}</td></tr>
+        <tr><td>コスト</td><td>{{ card_info.basic.cost }}</td></tr>
+        <tr><td>タイプ</td><td>{{ card_info.basic.card_type }}</td></tr>
+        <tr><td>レアリティ</td><td>{{ card_info.basic.rarity }}</td></tr>
+        {% if card_info.basic.attack is not none %}
+        <tr><td>攻撃力/体力</td><td>{{ card_info.basic.attack }}/{{ card_info.basic.defense }}</td></tr>
+        {% endif %}
+    </table>
+    
+    <h4>2Pick評価スコア</h4>
+    <table>
+        <tr><th>評価項目</th><th>スコア</th></tr>
+        <tr><td>基本評価</td><td><strong>{{ card_info.metrics.base_rating }}</strong></td></tr>
+        <tr><td>ステータス効率</td><td>{{ card_info.metrics.stat_efficiency }}</td></tr>
+        <tr><td>役割スコア</td><td>{{ card_info.metrics.role_score }}</td></tr>
+        <tr><td>キーワードスコア</td><td>{{ card_info.metrics.keyword_score }}</td></tr>
+        <tr><td>即時影響</td><td>{{ card_info.metrics.impact_score }}</td></tr>
+    </table>
+    
+    {% if card_info.basic.skill_text %}
+    <div class="card-detail">
+        <strong>スキル:</strong> {{ card_info.basic.skill_text }}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

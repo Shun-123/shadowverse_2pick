@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>ようこそ！</h2>
+<p>シャドウバース ワールズ ビヨンドの2Pickモードをサポートするアドバイスツールです。</p>
+<div class="card-detail">
+    <h3>🔍 カード検索</h3>
+    <p>カードIDまたは名前で検索し、2Pick評価スコアを確認できます。</p>
+    <a href="/search" style="color: #667eea;">カード検索へ →</a>
+</div>
+<div class="card-detail">
+    <h3>🎯 2Pickアドバイス</h3>
+    <p>候補カード2枚から最適な選択をアドバイスします。</p>
+    <a href="/advice" style="color: #667eea;">アドバイスを受ける →</a>
+</div>
+{% endblock %}
