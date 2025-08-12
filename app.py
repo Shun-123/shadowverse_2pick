@@ -128,7 +128,8 @@ def pick_advice():
                         'confidence': round(advice.confidence, 1),
                         'reasoning': advice.reasoning,
                         'card_scores': advice.card_scores,
-                        'deck_info': f"デッキ: {result['resolved_deck_count']}/{result['original_deck_count']}枚解決"
+                        'deck_info': f"デッキ: {result['resolved_deck_count']}/{result['original_deck_count']}枚解決",
+                        'recommended_card_id': getattr(advice, 'recommended_card_id', '')
                     }
                 
         except ValueError:
