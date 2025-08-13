@@ -153,7 +153,7 @@
         
         const scores = {{ advice_result.card_scores | tojson if advice_result else '[]' }};
         const candidateIds = scores.map(s => s.card_id);
-        const recommendedId = "{{ advice_result.advice.recommended_card_id if advice_result and advice_result.advice.recommended_card_id else '' }}";
+        const recommendedId = "{{ advice_result.recommended_card_id if advice_result and advice_result.recommended_card_id else '' }}";
         
         const deckInput = document.getElementById('deck_input').value || '';
         const deckSnapshot = deckInput.split(',').map(s => s.trim()).filter(Boolean);
